@@ -1,0 +1,96 @@
+%%
+% For initializing the parameters
+
+%% Vehicle Parameters
+
+vehicle_parameters.J_N = diag([0.002237568,0.002985236,0.00480374]); % Nominal (known) component of Moment of Inertia (Kg.m^2)
+
+inv_J_N = inv(vehicle_parameters.J_N);
+
+% vehicle_parameters.Delta_J = 0.0005*eye(3); % Unknown perturbation of Moment of Inertia
+vehicle_parameters.Delta_J = 0; % Unknown perturbation of Moment of Inertia
+
+vehicle_parameters.J = vehicle_parameters.J_N + vehicle_parameters.Delta_J; % (Unknown) Moment of Inertia
+
+vehicle_parameters.m = 0.429; % Vehicle mass (kg)
+
+vehicle_parameters.g = 9.81; % m/s^2
+
+f2M=0.0301;
+
+d1=d2
+
+PerMotor2TM=[1,1,1,1;
+    d1,-d1,-d1,d1;
+    -d2,-d2,d2,d2;
+    -f2M,f2M,-f2M,f2M];
+%% Control Gains
+
+kx = 100;
+kv = 14  ;
+kR = 10;
+kP = 50*eye(3);
+kI = 100;
+kFF = 2*eye(3);
+
+%% L1 Control
+
+Am = -kP; Bm = eye(3); Cm = eye(3);
+
+% Adaptive Law
+
+Ts = 5e-5; % This value is also passed on as the simulation time setp
+
+Mat_expm = expm(Am*Ts); % e^(Am*Ts)
+Phi = Am\(Mat_expm - eye(3));
+
+% Filter
+
+k = 1; %144;
+w1 = 15; % filter 1 bandwidth. -- net effect is cascaded first order filtering (2) of L1 command
+w2 = 15; % filter 2 bandwidth
+s = tf('s');
+D =  w1*w2/(s^2+(w1+w2)*s); %((s+500)*(s+0.004)^2)/(s*(s+368)*(s + 0.00439)^2);
+D = -k*D;
+[D_num,D_den] = tfdata(D,'v');
+
+% Feedforward gain
+
+kG = -inv(Cm*(Am\Bm));
+
+%% Simulation Parameters
+
+% Initial Conditions (Verify condition w.r.t. reference commands)
+
+x0 = [0; 0; 0];
+v0 = [0; 0; 0];
+R0 = eye(3);
+Omega0 = [0; 0; 0];
+
+%% Set the parameters
+% In Free_Flight/Flight Controller/Supervisory Flight Controller/Attitude_Control/Rate Control/L1 Adaptive Control/Adaptation Law
+% Could only use the manucal set
+% set_param('Free_Flight/Flight Controller/Supervisory Flight Controller/Attitude_Control/Rate Control/L1 Adaptive Control/Adaptation Law/Phi','Value',num2str(Phi));
+% set_param('Free_Flight/Flight Controller/Supervisory Flight Controller/Attitude_Control/Rate Control/L1 Adaptive Control/Adaptation Law/Phi1','Value',num2str(Mat_expm));
+
+% In Free_Flight/Flight Controller/Supervisory Flight Controller/Position_Control
+set_param('Free_Flight/Flight Controller/Supervisory Flight Controller/Position_Control/kx','Value',num2str(kx));
+set_param('Free_Flight/Flight Controller/Supervisory Flight Controller/Position_Control/kv','Value',num2str(kv));
+set_param('Free_Flight/Flight Controller/Supervisory Flight Controller/Position_Control/m','Value',num2str(vehicle_parameters.m));
+set_param('Free_Flight/Flight Controller/Supervisory Flight Controller/Position_Control/g','Value',num2str(vehicle_parameters.g));
+set_param('Free_Flight/Flight Controller/Supervisory Flight Controller/Attitude_Control/Rate Control/Desired Rates/kR','Value',num2str(kR));
+%% Simulation
+% 
+% sim_time = 10; % Simulation Horizon
+% sim('Quadrotor',sim_time);
+
+%% Plots
+
+% plot3(x.signals.values(:,1),x.signals.values(:,2),x.signals.values(:,3))
+% hold on; grid on;
+% plot3(xd.signals.values(:,1),xd.signals.values(:,2),xd.signals.values(:,3),'--')
+% grid on
+% ylabel('$x(t),x_d(t)$','Interpreter','latex')
+% ylabel('$y(t),y_d(t)$','Interpreter','latex')
+% zlabel('$z(t),z_d(t)$','Interpreter','latex')
+% legend('$X(t)$','$X_d(t)$','Interpreter','latex')
